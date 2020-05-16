@@ -48,17 +48,45 @@ legend('topright', fill = colours, legend = c("True", "TRMM"))
 dev.off()
 
 ##########################################################
-# interpolation algorithm for the value transfering
+# Bias correction algorithm for correcting the TRMM data
 
-sim = df_modelData$Var1[751]
-sim_q = df_modelData$CDF[751]
+obs_vec = round(df_trueData$Var1, digits = 7)
+obs_q_vec = round(df_trueData$CDF, digits = 7)
 
-j = 0
-for(i in df_trueData$CDF){
-  j = j + 1
-  if(i > sim_q){
-    # interp_df = data.frame(df_trueData$CDF[j-1:j], df_trueData$Var1[j-1:j])
-    x = df_trueData$CDF[j-1:j]
-    break
+df$corrected = NA
+
+for(i in seq(1,length(df$model.data)))
+{
+  sim = round(df$model.data[i], digits = 7)
+  sim_q = round(approx(df_modelData$Var1, df_modelData$CDF, xout = sim)$y, digits = 7)
+  
+  if(sim_q > min(obs_q_vec))
+  {
+    cor_sim = approx(obs_q_vec, obs_vec, xout = sim_q)$y
+    df$corrected[i] = cor_sim
+  }
+  else
+  {
+    cor_sim = min(obs_vec)
+    df$corrected[i] = cor_sim
   }
 }
+#####################################################################
+# checking the correction using cdf plotting 
+
+cor = df$corrected
+df_cor = as.data.frame(table(cor))
+df_cor$cor = round(as.numeric(as.character(df_cor$cor)), digits = 7)
+df_cor$PDF = df_cor$Freq / length(df$corrected)
+df_cor$CDF = cumsum(df_cor$PDF)
+
+
+min_lim_x = min(df_trueData$Var1, df_modelData$Var1, df_cor$cor)
+max_lim_x = max(df_trueData$Var1, df_modelData$Var1, df_cor$cor)
+
+# par(lwd = 0.3)
+plot(1, xlim = c(min_lim_x, max_lim_x), ylim = c(0,1), type = "n", xlab = "Rainfall", ylab = "CDF")
+points(df_trueData$Var1,df_trueData$CDF, col = "yellow", pch = "*")
+points(df_modelData$Var1,df_modelData$CDF, col = "red", pch = "*")
+points(df_cor$cor,df_cor$CDF, col = "black", pch = ".")
+dev.off()
